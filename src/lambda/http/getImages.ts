@@ -30,8 +30,7 @@ export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEven
   return {
     statusCode: 201,
     headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Credentials': true
+      'Access-Control-Allow-Origin': '*'
     },
     body: JSON.stringify({
       items: images
