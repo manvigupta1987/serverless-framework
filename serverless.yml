@@ -53,18 +53,22 @@ custom:
   webpack:
     webpackConfig: ./webpack.config.js
     includeModules: true
-
+  
+  topicName: imagesTopic-${self:provider.stage}
   documentation:
     api:
       info:
         version: v1.0.0
-        title : Udagram API
+        title: Udagram API
         description: Serverless application for images sharing
-
     models:
       - name: GroupRequest
         contentType: application/json
         schema: ${file(models/create-group-request.json)}
+      - name: ImageRequest
+        contentType: application/json
+        schema: ${file(models/create-image-request.json)}
+        
 functions:
   GetGroups:
     handler: src/lambda/http/getGroups.handler
@@ -115,6 +119,16 @@ functions:
       API_ID:
         Ref: WebsocketsApi
     handler: src/lambda/s3/sendNotifications.handler
+    events:
+      - sns:
+          arn:
+            Fn::Join:
+              - ':'
+              - - arn:aws:sns
+                - Ref: AWS::Region
+                - Ref: AWS::AccountId
+                - ${self:custom.topicName}
+          topicName: ${self:custom.topicName}
   
   ConnectHandler:
     handler: src/lambda/websocket/connect.handler
@@ -204,9 +218,9 @@ resources:
       Properties:
         BucketName: ${self:provider.environment.IMAGES_S3_BUCKET}
         NotificationConfiguration:
-          LambdaConfigurations:
-            - Event: s3:ObjectCreated:*
-              Function: !GetAtt SendUploadNotificationsLambdaFunction.Arn
+          TopicConfigurations:
+            - Event: s3:ObjectCreated:Put
+              Topic: !Ref ImagesTopic
         CorsConfiguration:
           CorsRules:
             -
@@ -244,6 +258,30 @@ resources:
               Action: 's3:GetObject'
               Resource: 'arn:aws:s3:::${self:provider.environment.IMAGES_S3_BUCKET}/*'
         Bucket: !Ref AttachmentsBucket
+    
+    SNSTopicPolicy:
+      Type: AWS::SNS::TopicPolicy
+      Properties:
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Principal:
+                AWS: "*"
+              Action: sns:Publish
+              Resource:
+                !Ref ImagesTopic
+              Condition:
+                ArnLike:
+                  AWS:SourceArn: arn:aws:s3:::${self:provider.environment.IMAGES_S3_BUCKET}
+        Topics:
+          - !Ref ImagesTopic
+
+    ImagesTopic:
+      Type: AWS::SNS::Topic
+      Properties:
+        DisplayName: Image bucket topic
+        TopicName: ${self:custom.topicName}
 
     ImagesSearch:
       Type: AWS::Elasticsearch::Domain
