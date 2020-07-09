@@ -76,6 +76,8 @@ custom:
         schema: ${file(models/create-image-request.json)}
 
 functions:
+  Auth:
+    handler: src/lambda/auth/auth0Authorizer.handler
   GetGroups:
     handler: src/lambda/http/getGroups.handler
     events:
@@ -90,9 +92,14 @@ functions:
           method: post
           path: groups
           cors: true
-          request:
-            schema: 
-              application/json: ${file(models/create-group-request.json)}
+          authorizer: Auth
+          reqValidatorName: RequestBodyValidator
+          documentation:
+            summary: Create a new group
+            description: Create a new group
+            requestModels:
+              'application/json': GroupRequest
+
   GetImages:
     handler: src/lambda/http/getImages.handler
     events:
@@ -108,6 +115,7 @@ functions:
           method: get
           path: images/{imageId}
           cors: true
+
   CreateImage:
     handler: src/lambda/http/createImage.handler
     events:
@@ -115,9 +123,13 @@ functions:
           method: post
           path: groups/{groupId}/images
           cors: true
-          request:
-            schema: 
-              application/json: ${file(models/create-image-request.json)}
+          authorizer: Auth
+          reqValidatorName: RequestBodyValidator
+          documentation:
+            summary: Create a new image
+            description: Create a new image
+            requestModels:
+              'application/json': ImageRequest
   
   ResizeImage:
     handler: src/lambda/s3/resizeImage.handler
@@ -172,6 +184,17 @@ functions:
 
 resources:
   Resources:
+    GatewayResponseDefault4XX:
+      Type: AWS::ApiGateway::GatewayResponse
+      Properties:
+        ResponseParameters:
+          gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
+          gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+          gatewayresponse.header.Access-Control-Allow-Methods: "'GET,OPTIONS,POST'"
+        ResponseType: DEFAULT_4XX
+        RestApiId:
+          Ref: ApiGatewayRestApi
+          
     RequestBodyValidator:
       Type: "AWS::ApiGateway::RequestValidator"
       Properties:
@@ -291,7 +314,7 @@ resources:
       Type: AWS::S3::Bucket
       Properties:
         BucketName: ${self:provider.environment.THUMBNAILS_S3_BUCKET}
-        
+
     ImagesTopic:
       Type: AWS::SNS::Topic
       Properties:
