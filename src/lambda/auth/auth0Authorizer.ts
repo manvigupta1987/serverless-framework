@@ -1,20 +1,21 @@
 import 'source-map-support/register'
-import {CustomAuthorizerHandler,CustomAuthorizerEvent, CustomAuthorizerResult } from 'aws-lambda'
-import * as AWS from 'aws-sdk'
+import {CustomAuthorizerEvent, CustomAuthorizerResult } from 'aws-lambda'
 
 import {verify} from 'jsonwebtoken'
 import {JwtToken} from '../../auth/jwtToken'
+import * as middy from 'middy'
+import {secretsManager} from 'middy/middlewares'
 
 const secretId = process.env.AUTH_0_SECRET_ID
 const secretField = process.env.AUTH_0_SECRET_FIELD
 
-const client = new AWS.SecretsManager()
-let cachedSecret: string
+// const client = new AWS.SecretsManager()
+// let cachedSecret: string
 
-export const handler: CustomAuthorizerHandler = async(event: CustomAuthorizerEvent): Promise<CustomAuthorizerResult> => {
+export const handler = middy(async(event: CustomAuthorizerEvent, context): Promise<CustomAuthorizerResult> => {
   try {
     
-    const decodedToken = await verifyToken(event.authorizationToken)
+    const decodedToken = verifyToken(event.authorizationToken, context.AUTH0_SECRET[secretField])
     console.log('User was authorized')
 
     return {
@@ -47,9 +48,9 @@ export const handler: CustomAuthorizerHandler = async(event: CustomAuthorizerEve
       }
     }
   }
-}
+})
 
-async function verifyToken(authHeader: string): Promise<JwtToken> {
+ function verifyToken(authHeader: string, secret:string): JwtToken {
   if (!authHeader)
     throw new Error('No authentication header')
 
@@ -58,22 +59,28 @@ async function verifyToken(authHeader: string): Promise<JwtToken> {
 
   const split = authHeader.split(' ')
   const token = split[1]
-
-  const secretObject:any = await getSecret()
-  const secret = secretObject[secretField]
   return verify(token, secret) as JwtToken
 }
 
-async function getSecret() {
-  if(cachedSecret) return cachedSecret
+// async function getSecret() {
+//   if(cachedSecret) return cachedSecret
 
-  const data = await client.getSecretValue({
-    SecretId: secretId
-  }).promise()
+//   const data = await client.getSecretValue({
+//     SecretId: secretId
+//   }).promise()
 
-  cachedSecret = data.SecretString
-  return JSON.parse(cachedSecret)
-}
+//   cachedSecret = data.SecretString
+//   return JSON.parse(cachedSecret)
+// }
+
+handler.use(secretsManager({
+  cache: true,
+  cacheExpiryInMillis: 60000,
+  throwOnFailedCall: true,
+  secrets: {
+    AUTH0_SECRET : secretId
+  }
+}))
 
 
 
