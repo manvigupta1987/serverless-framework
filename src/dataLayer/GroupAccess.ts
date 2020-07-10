@@ -4,7 +4,7 @@ import * as AWS from 'aws-sdk'
 
 export class GroupAccess {
   constructor(
-    private readonly docClient:DocumentClient = new AWS.DynamoDB.DocumentClient(),
+    private readonly docClient:DocumentClient = createDynmoDbClient(),
     private readonly groupsTable = process.env.GROUPS_TABLE) {}
 
     async getAllGroups(): Promise<Group[]> {
@@ -27,5 +27,15 @@ export class GroupAccess {
 
       return group
     } 
-
 }
+
+function createDynmoDbClient() {
+  if(process.env.IS_OFFLINE) {
+    console.log('creating dynamo db client locally') 
+    return new AWS.DynamoDB.DocumentClient({
+      region: 'localhost',
+      endpoint: 'http://localhost:8000'
+    })
+  }
+  return new AWS.DynamoDB.DocumentClient()
+} 
