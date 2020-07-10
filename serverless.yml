@@ -8,6 +8,8 @@ plugins:
   - serverless-reqvalidator-plugin
   - serverless-dynamodb-local
   - serverless-offline
+  - serverless-plugin-canary-deployments
+
 
 provider:
   name: aws
@@ -33,6 +35,11 @@ provider:
 
 
   iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - codedeploy:*
+      Resource:
+        - '*'
     - Effect: Allow
       Action:
         - dynamodb:Scan
@@ -132,6 +139,9 @@ functions:
             description: Create a new group
             requestModels:
               'application/json': GroupRequest
+    deploymentSettings:
+      type: Linear10PercentEvery1Minute
+      alias: Live
 
   GetImages:
     handler: src/lambda/http/getImages.handler
